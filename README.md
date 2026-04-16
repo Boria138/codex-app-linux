@@ -10,13 +10,13 @@ The project is Linux-focused and not tied to a specific distro by name in the bu
 ## What `repack.sh` does
 
 1. Downloads (or reuses cached) upstream `Codex.dmg`.
-2. Extracts `Codex.app` payload (`app.asar`, `app.asar.unpacked`, bundled `codex` binary).
+2. Extracts `Codex.app` payload (`app.asar`, `app.asar.unpacked`, app metadata).
 3. Removes macOS-only artifacts (`sparkle-darwin`, `*.dylib`, `sparkle.node`).
 4. Rebuilds native modules (`better-sqlite3`, `node-pty`) for Linux/Electron.
 5. Re-packs `app.asar` with native unpack rules.
 6. Builds Linux `AppImage` via `electron-builder` (internal Electron runtime).
 7. Produces a release-ready artifact:
-   - `codex-linux-repack-<version>-<dmgsha12>-x86_64.AppImage`
+   - `codex-linux-repack-<version>-x86_64.AppImage`
 
 ## Local usage
 
@@ -28,6 +28,8 @@ Useful environment variables:
 
 - `UPSTREAM_URL` — DMG source URL  
   default: `https://persistent.oaistatic.com/codex-app-prod/Codex.dmg`
+- `CODEX_CLI_URL` — Linux Codex CLI archive URL  
+  default: `https://github.com/openai/codex/releases/latest/download/codex-x86_64-unknown-linux-gnu.tar.gz`
 - `FORCE_DOWNLOAD=1` — force DMG re-download
 - `DMG_PATH` — custom local DMG path
 
@@ -55,4 +57,5 @@ Behavior:
 ## Notes
 
 - AppImage contains internal Electron runtime.
-- The app is configured to use bundled `resources/codex` inside the packaged artifact.
+- The app is configured to use bundled Linux `resources/codex` inside the packaged artifact.
+- `repack.sh` downloads the latest Linux `codex` CLI archive from GitHub Releases and copies `codex-x86_64-unknown-linux-gnu` into `resources/codex`.

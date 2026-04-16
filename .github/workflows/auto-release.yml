@@ -1,0 +1,68 @@
+name: Auto release DMG repack
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  UPSTREAM_URL: ${{ vars.UPSTREAM_URL || 'https://persistent.oaistatic.com/codex-app-prod/Codex.dmg' }}
+  STATE_FILE: ${{ vars.STATE_FILE || 'upstream.sha256' }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tooling
+        run: |
+          set -euo pipefail
+          pacman -Sy --noconfirm --needed \
+            git curl p7zip nodejs npm python python-pip python-setuptools \
+            base-devel libarchive github-cli
+
+      - name: Ensure scripts are executable
+        run: |
+          set -euo pipefail
+          chmod +x repack.sh
+          chmod +x scripts/*.sh
+
+      - name: Check upstream
+        id: check
+        run: |
+          set -euo pipefail
+          scripts/check_upstream.sh
+
+      - name: Skip when no upstream change
+        if: steps.check.outputs.changed != 'true'
+        run: echo "No upstream change detected."
+
+      - name: Build release artifacts
+        if: steps.check.outputs.changed == 'true'
+        id: build
+        env:
+          HOME: /root
+        run: |
+          set -euo pipefail
+          scripts/build_release_artifacts.sh
+
+      - name: Publish GitHub release
+        if: steps.check.outputs.changed == 'true'
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPIMAGE_PATH: ${{ steps.build.outputs.appimage_path }}
+          APP_VERSION: ${{ steps.check.outputs.app_version }}
+          UPSTREAM_SHA256: ${{ steps.check.outputs.upstream_sha256 }}
+        run: |
+          set -euo pipefail
+          scripts/publish_release.sh
