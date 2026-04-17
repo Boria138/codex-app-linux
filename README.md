@@ -1,11 +1,11 @@
-# Codex macOS DMG -> Linux AppImage Repack
+# Codex macOS DMG -> Linux Repack
 
 This repository contains:
 
-- `repack.sh` — a script that repacks upstream `Codex.dmg` into a Linux AppImage with internal Electron runtime.
+- `repack.sh` — a script that repacks upstream `Codex.dmg` into Linux artifacts.
 - GitHub Actions automation that checks upstream DMG updates and publishes new GitHub Releases automatically.
 
-The project is Linux-focused and not tied to a specific distro by name in the build output format (AppImage).
+The project is Linux-focused and produces portable build artifacts without distro-specific packaging.
 
 ## What `repack.sh` does
 
@@ -14,9 +14,11 @@ The project is Linux-focused and not tied to a specific distro by name in the bu
 3. Removes macOS-only artifacts (`sparkle-darwin`, `*.dylib`, `sparkle.node`).
 4. Rebuilds native modules (`better-sqlite3`, `node-pty`) for Linux/Electron.
 5. Re-packs `app.asar` with native unpack rules.
-6. Builds Linux `AppImage` via `electron-builder` (internal Electron runtime).
-7. Produces a release-ready artifact:
+6. Builds Linux `dir`, `AppImage`, and `tar.gz` artifacts via `electron-builder`.
+7. Forces Electron to use X11/XWayland instead of native Wayland.
+8. Produces release-ready artifacts:
    - `codex-linux-repack-<version>-x86_64.AppImage`
+   - `codex-linux-repack-<version>-x86_64.tar.gz`
 
 ## Local usage
 
@@ -45,6 +47,7 @@ Behavior:
 2. If DMG changed, runs repack build.
 3. Publishes GitHub Release with:
    - built `.AppImage`
+   - built `.tar.gz`
    - `sha256sums.txt`
 4. Updates and commits `upstream.sha256` in this repo.
 
@@ -56,6 +59,6 @@ Behavior:
 
 ## Notes
 
-- AppImage contains internal Electron runtime.
+- The generated bootstrap forces Electron to start with `--ozone-platform=x11`, so on Wayland sessions the app runs through XWayland.
 - The app is configured to use bundled Linux `resources/codex` inside the packaged artifact.
 - `repack.sh` downloads the latest Linux `codex` CLI archive from GitHub Releases and copies `codex-x86_64-unknown-linux-gnu` into `resources/codex`.
