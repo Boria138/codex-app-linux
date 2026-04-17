@@ -22,7 +22,7 @@ fi
 
 short_sha="${UPSTREAM_SHA256:0:12}"
 release_tag="${APP_VERSION}"
-release_title="Codex Linux Repack ${APP_VERSION}"
+release_title="Codex app repack for Linux ${APP_VERSION}"
 
 sha_file="$(dirname "$APPIMAGE_PATH")/sha256sums.txt"
 if [[ ! -f "$sha_file" ]]; then

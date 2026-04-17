@@ -1,4 +1,4 @@
-# Codex macOS DMG -> Linux Repack
+# Codex app macOS DMG -> Linux Repack
 
 This repository contains:
 
@@ -10,15 +10,15 @@ The project is Linux-focused and produces portable build artifacts without distr
 ## What `repack.sh` does
 
 1. Downloads (or reuses cached) upstream `Codex.dmg`.
-2. Extracts `Codex.app` payload (`app.asar`, `app.asar.unpacked`, app metadata).
+2. Extracts the `Codex.app` macOS bundle payload (`app.asar`, `app.asar.unpacked`, app metadata).
 3. Removes macOS-only artifacts (`sparkle-darwin`, `*.dylib`, `sparkle.node`).
 4. Rebuilds native modules (`better-sqlite3`, `node-pty`) for Linux/Electron.
 5. Re-packs `app.asar` with native unpack rules.
 6. Builds Linux `dir`, `AppImage`, and `tar.gz` artifacts via `electron-builder`.
 7. Forces Electron to use X11/XWayland instead of native Wayland.
 8. Produces release-ready artifacts:
-   - `codex-linux-repack-<version>-x86_64.AppImage`
-   - `codex-linux-repack-<version>-x86_64.tar.gz`
+   - `codex-app-<version>-x86_64.AppImage`
+   - `codex-app-<version>-x86_64.tar.gz`
 
 ## Local usage
 

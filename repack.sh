@@ -244,8 +244,8 @@ BUILDER_DIR="$ROOT_APP_DIR/_electron-builder"
 CLEANUP_DIRS+=("$BUILDER_DIR")
 rm -rf "$BUILDER_DIR"; mkdir -p "$BUILDER_DIR/resources"
 
-APP_PRODUCT_NAME="$(node -p "try{const p=require('$ROOT_APP_DIR/app_extracted/package.json');p.productName||p.name||'Codex'}catch(e){'Codex'}" 2>/dev/null || echo "Codex")"
-APP_EXECUTABLE_NAME="codex-app-linux-port"
+APP_PRODUCT_NAME="codex-app"
+APP_EXECUTABLE_NAME="codex-app"
 log_info "productName: $APP_PRODUCT_NAME | executable: $APP_EXECUTABLE_NAME | version: $APP_VERSION"
 
 log_info "Copying resources..."
@@ -279,11 +279,11 @@ BOOTSTRAP
 # Minimal electron-builder package definition.
 cat > "$BUILDER_DIR/package.json" <<EOF
 {
-  "name": "codex-linux-repack",
+  "name": "codex-app",
   "private": true,
   "version": "$APP_VERSION",
   "main": "bootstrap.js",
-  "description": "Codex Linux port",
+  "description": "Codex app for Linux",
   "author": "OpenAI (ported)",
   "scripts": { "dist": "electron-builder --linux dir AppImage tar.gz --publish never" },
   "devDependencies": {
@@ -309,7 +309,7 @@ cat > "$BUILDER_DIR/package.json" <<EOF
       "category": "Development",
       "icon": "resources/electron.icns",
       "executableName": "$APP_EXECUTABLE_NAME",
-      "artifactName": "\${productName}-\${version}-\${arch}.\${ext}"
+      "artifactName": "codex-app-\${version}-\${arch}.\${ext}"
     }
   }
 }
@@ -351,12 +351,12 @@ TAR_GZ_PATH="$(find "$BUILDER_DIR/dist" -maxdepth 1 -type f -name '*.tar.gz' | h
 
 ARTIFACT_DIR="${ARTIFACT_DIR:-$ROOT_APP_DIR/artifacts}"
 mkdir -p "$ARTIFACT_DIR"
-RENAMED_APPIMAGE="$ARTIFACT_DIR/codex-linux-repack-${APP_VERSION}-x86_64.AppImage"
+RENAMED_APPIMAGE="$ARTIFACT_DIR/codex-app-${APP_VERSION}-x86_64.AppImage"
 cp -f "$APPIMAGE_PATH" "$RENAMED_APPIMAGE"
 chmod +x "$RENAMED_APPIMAGE"
 
 if [[ -n "$TAR_GZ_PATH" ]]; then
-  RENAMED_TAR_GZ="$ARTIFACT_DIR/codex-linux-repack-${APP_VERSION}-x86_64.tar.gz"
+  RENAMED_TAR_GZ="$ARTIFACT_DIR/codex-app-${APP_VERSION}-x86_64.tar.gz"
   cp -f "$TAR_GZ_PATH" "$RENAMED_TAR_GZ"
 fi
 
