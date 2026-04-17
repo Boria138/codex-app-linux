@@ -43,7 +43,7 @@ if [ ${#MISSING[@]} -gt 0 ]; then
   log_err "Missing: ${MISSING[*]}"
   if [ -f /etc/debian_version ]; then
     log_err "Install: sudo apt-get install -y build-essential python3-dev libsqlite3-dev pkg-config libx11-dev libxkbfile-dev p7zip-full"
-  elif grep -q "ALT\|Fedora\|CentOS" /etc/os-release 2>/dev/null; then
+  elif grep -q "Fedora\|CentOS" /etc/os-release 2>/dev/null; then
     log_err "Install: sudo yum install -y gcc-c++ make python3-devel sqlite-devel pkgconf-pkg-config libX11-devel libxkbfile-devel p7zip"
   fi
   die "Cannot continue without build tools"
@@ -265,10 +265,6 @@ find "$BUILDER_DIR/resources/codex.asar.unpacked" -name "*.node" -exec chmod 755
 cat > "$BUILDER_DIR/bootstrap.js" <<'BOOTSTRAP'
 "use strict";
 const path = require("path");
-const { app } = require("electron");
-
-app.commandLine.appendSwitch("ozone-platform", "x11");
-app.commandLine.appendSwitch("enable-features", "UseOzonePlatform");
 
 process.env.ELECTRON_FORCE_IS_PACKAGED = "1";
 process.env.NODE_ENV = "production";
@@ -279,12 +275,12 @@ BOOTSTRAP
 # Minimal electron-builder package definition.
 cat > "$BUILDER_DIR/package.json" <<EOF
 {
-  "name": "codex-app",
+  "name": "Codex App",
   "private": true,
   "version": "$APP_VERSION",
   "main": "bootstrap.js",
   "description": "Codex app for Linux",
-  "author": "OpenAI (ported)",
+  "author": "Boria138",
   "scripts": { "dist": "electron-builder --linux dir AppImage tar.gz --publish never" },
   "devDependencies": {
     "electron": "$ELECTRON_VERSION",

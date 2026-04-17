@@ -15,8 +15,7 @@ The project is Linux-focused and produces portable build artifacts without distr
 4. Rebuilds native modules (`better-sqlite3`, `node-pty`) for Linux/Electron.
 5. Re-packs `app.asar` with native unpack rules.
 6. Builds Linux `dir`, `AppImage`, and `tar.gz` artifacts via `electron-builder`.
-7. Forces Electron to use X11/XWayland instead of native Wayland.
-8. Produces release-ready artifacts:
+7. Produces release-ready artifacts:
    - `codex-app-<version>-x86_64.AppImage`
    - `codex-app-<version>-x86_64.tar.gz`
 
@@ -59,6 +58,8 @@ Behavior:
 
 ## Notes
 
-- The generated bootstrap forces Electron to start with `--ozone-platform=x11`, so on Wayland sessions the app runs through XWayland.
+- If the window flickers, renders incorrectly, or shows other display issues in a Wayland session, run the app through `Xwayland`, for example:
+  - `./codex-app-<version>-x86_64.AppImage --ozone-platform=x11`
+  - `./codex-app --ozone-platform=x11`
 - The app is configured to use bundled Linux `resources/codex` inside the packaged artifact.
 - `repack.sh` downloads the latest Linux `codex` CLI archive from GitHub Releases and copies `codex-x86_64-unknown-linux-gnu` into `resources/codex`.
