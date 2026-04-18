@@ -244,7 +244,7 @@ BUILDER_DIR="$ROOT_APP_DIR/_electron-builder"
 CLEANUP_DIRS+=("$BUILDER_DIR")
 rm -rf "$BUILDER_DIR"; mkdir -p "$BUILDER_DIR/resources"
 
-APP_PRODUCT_NAME="codex-app"
+APP_PRODUCT_NAME="Codex App"
 APP_EXECUTABLE_NAME="codex-app"
 log_info "productName: $APP_PRODUCT_NAME | executable: $APP_EXECUTABLE_NAME | version: $APP_VERSION"
 
@@ -275,7 +275,7 @@ BOOTSTRAP
 # Minimal electron-builder package definition.
 cat > "$BUILDER_DIR/package.json" <<EOF
 {
-  "name": "Codex App",
+  "name": "codex-app",
   "private": true,
   "version": "$APP_VERSION",
   "main": "bootstrap.js",
