@@ -15,32 +15,54 @@ env:
 jobs:
   release:
     runs-on: ubuntu-latest
-    container:
-      image: archlinux:base-devel
 
     steps:
-
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
       - name: Install tooling
         run: |
           set -euo pipefail
-          pacman -Sy --noconfirm --needed \
-            git curl p7zip nodejs npm python python-pip python-setuptools \
-            base-devel libarchive github-cli
+          sudo apt-get update
+          sudo apt-get install -y \
+            git curl p7zip-full nodejs npm python3 python3-pip \
+            build-essential libarchive-tools libsqlite3-dev pkg-config \
+            libx11-dev libxkbfile-dev
 
       - name: Ensure scripts are executable
         run: |
           set -euo pipefail
           chmod +x repack.sh
-          chmod +x scripts/*.sh
 
       - name: Check upstream
         id: check
         run: |
           set -euo pipefail
-          scripts/check_upstream.sh
+          tmp_dmg="Codex.dmg.tmp"
+          rm -f "$tmp_dmg"
+          curl -fL --retry 3 --retry-delay 2 "$UPSTREAM_URL" -o "$tmp_dmg"
+          mv "$tmp_dmg" Codex.dmg
+
+          upstream_sha256="$(sha256sum Codex.dmg | awk '{print $1}')"
+          previous_sha256=""
+          if [[ -f "$STATE_FILE" ]]; then
+            previous_sha256="$(tr -d '[:space:]' < "$STATE_FILE")"
+          fi
+
+          changed=false
+          if [[ "$upstream_sha256" != "$previous_sha256" ]]; then
+            changed=true
+            printf '%s\n' "$upstream_sha256" > "$STATE_FILE"
+          fi
+
+          {
+            printf 'changed=%s\n' "$changed"
+            printf 'upstream_sha256=%s\n' "$upstream_sha256"
+            printf 'dmg_path=%s\n' "Codex.dmg"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Skip when no upstream change
         if: steps.check.outputs.changed != 'true'
@@ -49,20 +71,68 @@ jobs:
       - name: Build release artifacts
         if: steps.check.outputs.changed == 'true'
         id: build
-        env:
-          HOME: /root
         run: |
           set -euo pipefail
-          scripts/build_release_artifacts.sh
+          mkdir -p dist/release
+          ARTIFACT_DIR="$PWD/dist/release" bash ./repack.sh
 
-      - name: Publish GitHub release
+      - name: Generate checksums
         if: steps.check.outputs.changed == 'true'
-        id: publish
-        env:
-          GH_TOKEN: ${{ github.token }}
-          APPIMAGE_PATH: ${{ steps.build.outputs.appimage_path }}
-          APP_VERSION: ${{ steps.check.outputs.app_version }}
-          UPSTREAM_SHA256: ${{ steps.check.outputs.upstream_sha256 }}
         run: |
           set -euo pipefail
-          scripts/publish_release.sh
+          cd dist/release
+          : > sha256sums.txt
+          for f in *.AppImage *.tar.gz; do
+            if [[ -f "$f" ]]; then
+              sha256sum "$f" >> sha256sums.txt
+            fi
+          done
+
+      - name: Publish to GitHub Release
+        if: steps.check.outputs.changed == 'true'
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
+        with:
+          tag_name: ${{ steps.build.outputs.app_version || '0.0.0' }}
+          body: |
+            Automated DMG repack release.
+
+            - Version: ${{ steps.build.outputs.app_version }}
+            - Upstream DMG SHA256: ${{ steps.check.outputs.upstream_sha256 }}
+          files: |
+            dist/release/*.AppImage
+            dist/release/sha256sums.txt
+            dist/release/*.tar.gz
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Debug workspace before commit
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          pwd
+          ls -la
+          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
+          ls -la "${GITHUB_WORKSPACE}" || true
+          ls -la "${GITHUB_WORKSPACE}/.git" || true
+
+      - name: Commit upstream sha256 state
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          branch="${GITHUB_REF_NAME}"
+          message="chore: update upstream sha256 to ${{ steps.check.outputs.upstream_sha256 }}"
+
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          git add "${STATE_FILE}"
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "${message}"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${branch}"

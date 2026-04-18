@@ -100,7 +100,7 @@ log_step "[3] Extract DMG and app bundle"
 
 cd "$ROOT_APP_DIR"
 log_info "Extracting DMG..."
-7z x -y -aoa "$DMG_PATH" -o./dmg_extracted > /dev/null
+7z x -y -aoa "$DMG_PATH" -o./dmg_extracted 'Codex Installer/Codex.app/*' > /dev/null
 
 APP_BUNDLE_DIR="$(find ./dmg_extracted -maxdepth 6 -type d -name '*.app' | head -n1)"
 [ -n "$APP_BUNDLE_DIR" ] || die "Could not find .app bundle"

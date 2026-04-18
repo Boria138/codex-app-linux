@@ -50,12 +50,6 @@ Behavior:
    - `sha256sums.txt`
 4. Updates and commits `upstream.sha256` in this repo.
 
-## Release helper scripts
-
-- `scripts/check_upstream.sh` — detect upstream DMG changes
-- `scripts/build_release_artifacts.sh` — run repack and collect artifacts
-- `scripts/publish_release.sh` — create/update GitHub release assets
-
 ## Notes
 
 - If the window flickers, renders incorrectly, or shows other display issues in a Wayland session, run the app through `Xwayland`, for example:
