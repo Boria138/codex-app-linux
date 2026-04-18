@@ -21,7 +21,9 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+        with:
+          fetch-depth: 0
 
       - name: Install tooling
         run: |
@@ -66,3 +68,24 @@ jobs:
         run: |
           set -euo pipefail
           scripts/publish_release.sh
+
+      - name: Debug workspace before commit
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          pwd
+          ls -la
+          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
+          ls -la "${GITHUB_WORKSPACE}" || true
+          ls -la "${GITHUB_WORKSPACE}/.git" || true
+
+      - name: Commit upstream sha256 state
+        if: steps.check.outputs.changed == 'true'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          repository: ${{ github.workspace }}
+          commit_message: "chore: update upstream sha256 to ${{ steps.check.outputs.upstream_sha256 }}"
+          file_pattern: ${{ env.STATE_FILE }}
+          branch: ${{ github.ref_name }}
+          commit_user_name: github-actions[bot]
+          commit_user_email: 41898282+github-actions[bot]@users.noreply.github.com
