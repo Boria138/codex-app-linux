@@ -22,6 +22,7 @@ fi
 changed="false"
 if [[ "$upstream_sha256" != "$previous_sha256" ]]; then
   changed="true"
+  printf '%s\n' "$upstream_sha256" > "$STATE_FILE"
 fi
 
 extract_plist_value() {
