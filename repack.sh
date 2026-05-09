@@ -59,7 +59,7 @@ log_step "[1] Download Codex.dmg"
 
 UPSTREAM_URL="${UPSTREAM_URL:-https://persistent.oaistatic.com/codex-app-prod/Codex.dmg}"
 CODEX_CLI_ARCHIVE_NAME="${CODEX_CLI_ARCHIVE_NAME:-codex-cli-linux.tar.gz}"
-CODEX_CLI_BIN_NAME="${CODEX_CLI_BIN_NAME:-codex-x86_64-unknown-linux-gnu}"
+CODEX_CLI_BIN_NAME="${CODEX_CLI_BIN_NAME:-codex-x86_64-unknown-linux-musl}"
 CODEX_CLI_URL="${CODEX_CLI_URL:-https://github.com/openai/codex/releases/latest/download/${CODEX_CLI_BIN_NAME}.tar.gz}"
 DOWNLOAD_DIR="${DOWNLOAD_DIR:-$HOME/Downloads/codex-macos}"
 mkdir -p "$DOWNLOAD_DIR"
