@@ -148,8 +148,18 @@ node "$SCRIPT_DIR/patch-linux-open-targets.mjs" "$ROOT_APP_DIR/app_extracted"
 # [4] Detect Electron version
 log_step "[4] Detect Electron version"
 
-ELECTRON_VERSION="39.0.0"
-log_info "Electron version: $ELECTRON_VERSION (hardcoded)"
+ELECTRON_VERSION=""
+ELECTRON_PLIST="$(find ./dmg_extracted -path "*/Electron Framework.framework/Versions/A/Resources/Info.plist" | head -n1)"
+if [ -n "$ELECTRON_PLIST" ] && [ -f "$ELECTRON_PLIST" ]; then
+  ELECTRON_VERSION="$(python3 - "$ELECTRON_PLIST" <<'PY'
+import plistlib,re,sys
+with open(sys.argv[1],"rb") as f: p=plistlib.load(f)
+print(re.sub(r"^[^0-9]+","",str(p.get("CFBundleVersion") or "").strip()))
+PY
+)"
+fi
+[ -z "$ELECTRON_VERSION" ] && ELECTRON_VERSION="$(node -p "try{String(require('$ROOT_APP_DIR/app_extracted/package.json').devDependencies?.electron||'').replace(/^[^0-9]*/,'')}catch(e){''}" 2>/dev/null)" || true
+[ -z "$ELECTRON_VERSION" ] && ELECTRON_VERSION="40.0.0" && log_warn "Could not detect Electron version, using $ELECTRON_VERSION" || log_info "Electron version: $ELECTRON_VERSION"
 
 # [5] Rebuild native modules
 log_step "[5] Rebuild native modules"
@@ -186,6 +196,19 @@ log_info "Installing source packages..."
 npm install --ignore-scripts --no-audit --no-fund \
   "$BSQL_TGZ" \
   "$NODE_PTY_TGZ" 2>&1 | sed 's/^/    /'
+
+log_info "Patching better-sqlite3 for Electron 42+..."
+# Patch better-sqlite3 for Electron 42+ V8 API changes
+_bs3=node_modules/better-sqlite3/src
+# v8::External::New() now requires an ExternalPointerTypeTag argument
+sed -i 's/v8::External::New(isolate, addon)/v8::External::New(isolate, addon, v8::kExternalPointerTypeTagDefault)/' \
+  "${_bs3}/better_sqlite3.cpp"
+# v8::External::Value() now requires an ExternalPointerTypeTag argument
+sed -i 's/v8::External>()->Value()/v8::External>()->Value(v8::kExternalPointerTypeTagDefault)/' \
+  "${_bs3}/util/macros.cpp"
+# SetNativeDataProperty: passing 0 as setter is ambiguous with new overloads
+sed -i '/SetNativeDataProperty/,/);/{s/func,/func,/;s/\t\t0,/\t\tnullptr,/}' \
+  "${_bs3}/util/helpers.cpp"
 
 log_info "Running electron-rebuild for Electron $ELECTRON_VERSION..."
 # Align with successful PKGBUILD strategy by setting npm_config environment variables.
