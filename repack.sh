@@ -3,6 +3,9 @@
 
 set -euo pipefail
 
+# Capture the absolute path to the directory containing this script.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 RED='\033[0;31m'
 YEL='\033[1;33m'
 GRN='\033[0;32m'
@@ -139,21 +142,14 @@ log_info "Removing macOS-only files..."
 rm -rf "$ROOT_APP_DIR/app_extracted/node_modules/sparkle-darwin" 2>/dev/null || true
 find "$ROOT_APP_DIR/app_extracted" -type f \( -name "*.dylib" -o -name "sparkle.node" \) -delete 2>/dev/null || true
 
+log_info "Applying Linux open-targets patch..."
+node "$SCRIPT_DIR/patch-linux-open-targets.mjs" "$ROOT_APP_DIR/app_extracted"
+
 # [4] Detect Electron version
 log_step "[4] Detect Electron version"
 
-ELECTRON_VERSION=""
-ELECTRON_PLIST="$(find ./dmg_extracted -path "*/Electron Framework.framework/Versions/A/Resources/Info.plist" | head -n1)"
-if [ -n "$ELECTRON_PLIST" ] && [ -f "$ELECTRON_PLIST" ]; then
-  ELECTRON_VERSION="$(python3 - "$ELECTRON_PLIST" <<'PY'
-import plistlib,re,sys
-with open(sys.argv[1],"rb") as f: p=plistlib.load(f)
-print(re.sub(r"^[^0-9]+","",str(p.get("CFBundleVersion") or "").strip()))
-PY
-)"
-fi
-[ -z "$ELECTRON_VERSION" ] && ELECTRON_VERSION="$(node -p "try{String(require('$ROOT_APP_DIR/app_extracted/package.json').devDependencies?.electron||'').replace(/^[^0-9]*/,'')}catch(e){''}" 2>/dev/null)" || true
-[ -z "$ELECTRON_VERSION" ] && ELECTRON_VERSION="40.0.0" && log_warn "Could not detect Electron version, using $ELECTRON_VERSION" || log_info "Electron version: $ELECTRON_VERSION"
+ELECTRON_VERSION="39.0.0"
+log_info "Electron version: $ELECTRON_VERSION (hardcoded)"
 
 # [5] Rebuild native modules
 log_step "[5] Rebuild native modules"
@@ -192,6 +188,12 @@ npm install --ignore-scripts --no-audit --no-fund \
   "$NODE_PTY_TGZ" 2>&1 | sed 's/^/    /'
 
 log_info "Running electron-rebuild for Electron $ELECTRON_VERSION..."
+# Align with successful PKGBUILD strategy by setting npm_config environment variables.
+export npm_config_runtime=electron
+export npm_config_target="$ELECTRON_VERSION"
+export npm_config_disturl="https://electronjs.org/headers"
+export npm_config_build_from_source=true
+
 npx --yes @electron/rebuild -v "$ELECTRON_VERSION" --force 2>&1 | sed 's/^/    /'
 
 rm -rf "$ROOT_APP_DIR/app_extracted/node_modules/better-sqlite3"
