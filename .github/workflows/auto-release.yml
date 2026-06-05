@@ -36,6 +36,7 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x repack.sh
+          chmod +x patches/*.mjs
 
       - name: Check upstream
         id: check

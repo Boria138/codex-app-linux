@@ -3,7 +3,10 @@
 This repository contains:
 
 - `repack.sh` — a script that repacks upstream `Codex.dmg` into Linux artifacts.
-- `patch-linux-open-targets.mjs` — a helper script to patch application JavaScript for Linux compatibility (editors, file manager).
+- `patches/` — a directory containing helper scripts for Linux compatibility:
+  - `patch-linux-open-targets.mjs` — patches application JavaScript for Linux editors/file managers.
+  - `patch-linux-opaque-bg.mjs` — enforces opaque window backgrounds to fix Wayland rendering issues.
+- `upstream.sha256` — tracks the hash of the last processed upstream DMG.
 - GitHub Actions automation that checks upstream DMG updates and publishes new GitHub Releases automatically.
 
 The project is Linux-focused and produces portable build artifacts without distro-specific packaging.
@@ -13,7 +16,7 @@ The project is Linux-focused and produces portable build artifacts without distr
 1. Downloads (or reuses cached) upstream `Codex.dmg`.
 2. Extracts the `Codex.app` macOS bundle payload (`app.asar`, `app.asar.unpacked`, app metadata).
 3. Removes macOS-only artifacts (`sparkle-darwin`, `*.dylib`, `sparkle.node`).
-4. **Patches application JavaScript** (`patch-linux-open-targets.mjs`) to support Linux-specific editors (VS Code, Cursor, Zed) and file managers.
+4. **Patches application JavaScript** (`patches/`) to support Linux-specific editors, file managers, and fix Wayland rendering issues.
 5. Rebuilds native modules (`better-sqlite3`, `node-pty`) for Linux/Electron.
 6. Re-packs `app.asar` with native unpack rules.
 7. Builds Linux `dir`, `AppImage`, and `tar.gz` artifacts via `electron-builder`.
@@ -52,6 +55,7 @@ Behavior:
 ## Credits
 
 - The Linux open-targets patch is inspired by and adapted from the [openai-codex-desktop](https://aur.archlinux.org/packages/openai-codex-desktop) AUR package, with additional refinements for robustness and compatibility with newer upstream versions.
+- The `better-sqlite3` and opaque background patches are adapted from [dcelasun's Gist](https://gist.github.com/dcelasun/8d002bc05d32491204c0bf695bc6b3d6).
 - The build strategy (environment variables for native module compilation) is aligned with the same AUR package standards.
 
 ## Notes

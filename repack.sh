@@ -143,7 +143,10 @@ rm -rf "$ROOT_APP_DIR/app_extracted/node_modules/sparkle-darwin" 2>/dev/null || 
 find "$ROOT_APP_DIR/app_extracted" -type f \( -name "*.dylib" -o -name "sparkle.node" \) -delete 2>/dev/null || true
 
 log_info "Applying Linux open-targets patch..."
-node "$SCRIPT_DIR/patch-linux-open-targets.mjs" "$ROOT_APP_DIR/app_extracted"
+node "$SCRIPT_DIR/patches/patch-linux-open-targets.mjs" "$ROOT_APP_DIR/app_extracted"
+
+log_info "Applying Linux opaque-background patch..."
+node "$SCRIPT_DIR/patches/patch-linux-opaque-bg.mjs" "$ROOT_APP_DIR/app_extracted"
 
 # [4] Detect Electron version
 log_step "[4] Detect Electron version"
