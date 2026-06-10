@@ -44,45 +44,82 @@ if (mainFiles.length !== 1) {
 const mainFile = mainFiles[0];
 let mainSource = readFileSync(mainFile, "utf8");
 
-// Match the BrowserWindow background color function. The pattern is:
-//   function <NAME>({platform:<P>,appearance:<A>,opaqueWindowsEnabled:<O>,prefersDarkColors:<D>}){
-//     return <O>&&!<PRED>(<A>)&&(<P>===`darwin`||<P>===`win32`)
-//       ? {backgroundColor:<D>?<DARK>:<LIGHT>,backgroundMaterial:<P>===`win32`?`none`:null}
-//       : <P>===`win32`&&!<PRED>(<A>)
-//         ? {backgroundColor:<TRANS>,backgroundMaterial:`mica`}
-//         : {backgroundColor:<TRANS>,backgroundMaterial:null}
-//   }
-const bgFuncRe = new RegExp(
-  "function\\s+([A-Za-z_$][\\w$]*)\\(" +
-    "\\{platform:([A-Za-z_$][\\w$]*)," +
-    "appearance:([A-Za-z_$][\\w$]*)," +
-    "opaqueWindowsEnabled:([A-Za-z_$][\\w$]*)," +
-    "prefersDarkColors:([A-Za-z_$][\\w$]*)\\}\\)" +
-    "\\{return\\s*\\4&&!([A-Za-z_$][\\w$]*)\\(\\3\\)&&" +
-    "\\(\\2===`darwin`\\|\\|\\2===`win32`\\)" +
-    "\\?\\{backgroundColor:\\5\\?([A-Za-z_$][\\w$]*):([A-Za-z_$][\\w$]*)," +
-    "backgroundMaterial:\\2===`win32`\\?`none`:null\\}" +
-    ":(\\2===`win32`&&!\\6\\(\\3\\)\\?" +
-    "\\{backgroundColor:([A-Za-z_$][\\w$]*)," +
-    "backgroundMaterial:`mica`\\})" +
-    ":\\{backgroundColor:\\10,backgroundMaterial:null\\}\\}"
-);
+function patchPlatformChecks(source) {
+  let patched = source;
+  const platformCheckRe = new RegExp(
+    "function\\s+([A-Za-z_$][\\w$]*)\\(" +
+      "\\{appearance:([A-Za-z_$][\\w$]*)," +
+      "(?:opaqueWindowsEnabled|isFocused):([A-Za-z_$][\\w$]*)," +
+      "platform:([A-Za-z_$][\\w$]*)\\}\\)" +
+      "\\{return([^{}]+?)&&\\(\\4===`darwin`\\|\\|\\4===`win32`\\)\\}",
+    "g"
+  );
 
-const bgMatch = mainSource.match(bgFuncRe);
+  patched = patched.replace(platformCheckRe, (fullMatch, funcName, appearanceVar, stateVar, platformVar, prefix) => {
+    if (fullMatch.includes(`${platformVar}===\`linux\``)) {
+      return fullMatch;
+    }
+    return (
+      `function ${funcName}({appearance:${appearanceVar},` +
+      `${fullMatch.includes("opaqueWindowsEnabled") ? "opaqueWindowsEnabled" : "isFocused"}:${stateVar},` +
+      `platform:${platformVar}}){return${prefix}&&` +
+      `(${platformVar}===\`darwin\`||${platformVar}===\`win32\`||${platformVar}===\`linux\`)}`
+    );
+  });
 
-if (!bgMatch) {
+  return patched;
+}
+
+function patchSurfaceBackgroundFunction(source) {
+  // Match the BrowserWindow background color function:
+  //   function <NAME>({platform:<P>,appearance:<A>,opaqueWindowSurfaceEnabled:<O>,prefersDarkColors:<D>}){
+  //     return <O>
+  //       ? {backgroundColor:<D>?<DARK>:<LIGHT>,backgroundMaterial:<P>===`win32`?`none`:null}
+  //       : <P>===`win32`&&!<PRED>(<A>)
+  //         ? {backgroundColor:<TRANS>,backgroundMaterial:`mica`}
+  //         : {backgroundColor:<TRANS>,backgroundMaterial:null}
+  //   }
+  const bgFuncRe = new RegExp(
+    "function\\s+([A-Za-z_$][\\w$]*)\\(" +
+      "\\{platform:([A-Za-z_$][\\w$]*)," +
+      "appearance:([A-Za-z_$][\\w$]*)," +
+      "opaqueWindowSurfaceEnabled:([A-Za-z_$][\\w$]*)," +
+      "prefersDarkColors:([A-Za-z_$][\\w$]*)\\}\\)" +
+      "\\{return\\s*\\4\\?" +
+      "\\{backgroundColor:\\5\\?([A-Za-z_$][\\w$]*):([A-Za-z_$][\\w$]*)," +
+      "backgroundMaterial:\\2===`win32`\\?`none`:null\\}" +
+      ":(\\2===`win32`&&!([A-Za-z_$][\\w$]*)\\(\\3\\)\\?" +
+      "\\{backgroundColor:([A-Za-z_$][\\w$]*)," +
+      "backgroundMaterial:`mica`\\})" +
+      ":\\{backgroundColor:\\10,backgroundMaterial:null\\}\\}"
+  );
+
+  const bgMatch = source.match(bgFuncRe);
+  if (!bgMatch) {
+    return { source, patched: false };
+  }
+
+  const [fullMatch, , pVar, aVar, , dVar, darkVar, lightVar, win32Branch, predFunc] = bgMatch;
+  const linuxBranch =
+    `${pVar}===\`linux\`&&!${predFunc}(${aVar})` +
+    `?{backgroundColor:${dVar}?${darkVar}:${lightVar},backgroundMaterial:null}:`;
+  const patchedFunc = fullMatch.replace(win32Branch, `${linuxBranch}${win32Branch}`);
+  return { source: source.replace(fullMatch, patchedFunc), patched: true };
+}
+
+const beforeMainSource = mainSource;
+mainSource = patchPlatformChecks(mainSource);
+
+const bgPatch = patchSurfaceBackgroundFunction(mainSource);
+
+if (!bgPatch.patched) {
   if (mainSource.includes("===`linux`&&!") && mainSource.includes("backgroundMaterial:null}:")) {
     console.log(`${TAG}: main bundle appears already patched`);
   } else {
     fail("could not find BrowserWindow background color function in main bundle");
   }
 } else {
-  const [fullMatch, funcName, pVar, aVar, oVar, dVar, predFunc, darkVar, lightVar, win32Branch, transVar] = bgMatch;
-  const linuxBranch =
-    `${pVar}===\`linux\`&&!${predFunc}(${aVar})` +
-    `?{backgroundColor:${dVar}?${darkVar}:${lightVar},backgroundMaterial:null}:`;
-  const patched = fullMatch.replace(win32Branch, `${linuxBranch}${win32Branch}`);
-  mainSource = mainSource.replace(fullMatch, patched);
+  mainSource = bgPatch.source;
 
   if (!mainSource.includes("===`linux`&&!")) {
     fail("patch verification failed: linux branch not found after patching");
@@ -90,6 +127,11 @@ if (!bgMatch) {
 
   writeFileSync(mainFile, mainSource);
   console.log(`${TAG}: patched ${mainFile}`);
+}
+
+if (!bgPatch.patched && mainSource !== beforeMainSource) {
+  writeFileSync(mainFile, mainSource);
+  console.log(`${TAG}: patched Linux opaque-surface platform checks in ${mainFile}`);
 }
 
 // ---------- 2. Patch webview theme defaults ----------
