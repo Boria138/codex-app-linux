@@ -103,9 +103,25 @@ log_step "[3] Extract DMG and app bundle"
 
 cd "$ROOT_APP_DIR"
 log_info "Extracting DMG..."
-7z x -y -aoa "$DMG_PATH" -o./dmg_extracted 'Codex Installer/Codex.app/*' > /dev/null
 
-APP_BUNDLE_DIR="$(find ./dmg_extracted -maxdepth 6 -type d -name '*.app' | head -n1)"
+# 1. Download latest 7zz from GitHub
+DOWNLOAD_DIR_7Z="$HOME/.local/bin"
+mkdir -p "$DOWNLOAD_DIR_7Z"
+LATEST_7Z_URL=$(curl -skL https://api.github.com/repos/ip7z/7zip/releases/latest | grep "browser_download_url" | grep "linux-x64.tar.xz" | head -n 1 | cut -d '"' -f 4)
+
+log_info "Downloading 7zz..."
+curl -fkL "$LATEST_7Z_URL" -o 7z.tar.xz
+tar -xf 7z.tar.xz 7zz && mv 7zz "$DOWNLOAD_DIR_7Z/7zz" && chmod +x "$DOWNLOAD_DIR_7Z/7zz"
+rm -f 7z.tar.xz
+
+# 2. Extract
+log_info "Running extraction..."
+# 7zz returns code 2 when skipping dangerous symlinks (common in node_modules).
+# We allow this as they aren't needed for the port.
+"$DOWNLOAD_DIR_7Z/7zz" x -snl -y -aoa "$DMG_PATH" -o./dmg_extracted 'Codex Installer/Codex.app/*' > /dev/null || [ $? -eq 2 ]
+
+# Find app bundle without causing 'Broken pipe' with pipefail
+APP_BUNDLE_DIR="$(find ./dmg_extracted -maxdepth 6 -type d -name '*.app' -print -quit)"
 [ -n "$APP_BUNDLE_DIR" ] || die "Could not find .app bundle"
 APP_BUNDLE_DIR="$(realpath "$APP_BUNDLE_DIR")"
 log_info "Found app bundle: $APP_BUNDLE_DIR"
@@ -148,6 +164,15 @@ node "$SCRIPT_DIR/patches/patch-linux-open-targets.mjs" "$ROOT_APP_DIR/app_extra
 log_info "Applying Linux opaque-background patch..."
 node "$SCRIPT_DIR/patches/patch-linux-opaque-bg.mjs" "$ROOT_APP_DIR/app_extracted"
 
+log_info "Applying Linux tray support patch..."
+node "$SCRIPT_DIR/patches/patch-linux-tray.mjs" "$ROOT_APP_DIR/app_extracted"
+
+log_info "Applying Linux window behavior patches (Menu, Icon, About)..."
+node "$SCRIPT_DIR/patches/patch-linux-window.mjs" "$ROOT_APP_DIR/app_extracted"
+
+log_info "Applying Linux single-instance lock patch..."
+node "$SCRIPT_DIR/patches/patch-linux-single-instance.mjs" "$ROOT_APP_DIR/app_extracted"
+
 # [4] Detect Electron version
 log_step "[4] Detect Electron version"
 
@@ -170,6 +195,7 @@ log_step "[5] Rebuild native modules"
 log_info "Preparing native module rebuild..."
 BSQL_VERSION="$(node -p "require('$ROOT_APP_DIR/app_extracted/node_modules/better-sqlite3/package.json').version")"
 NODE_PTY_VERSION="$(node -p "require('$ROOT_APP_DIR/app_extracted/node_modules/node-pty/package.json').version")"
+
 log_info "better-sqlite3: $BSQL_VERSION"
 log_info "node-pty: $NODE_PTY_VERSION"
 
@@ -214,7 +240,7 @@ sed -i '/SetNativeDataProperty/,/);/{s/func,/func,/;s/\t\t0,/\t\tnullptr,/}' \
   "${_bs3}/util/helpers.cpp"
 
 log_info "Running electron-rebuild for Electron $ELECTRON_VERSION..."
-# Align with successful PKGBUILD strategy by setting npm_config environment variables.
+
 export npm_config_runtime=electron
 export npm_config_target="$ELECTRON_VERSION"
 export npm_config_disturl="https://electronjs.org/headers"
@@ -222,10 +248,11 @@ export npm_config_build_from_source=true
 
 npx --yes @electron/rebuild -v "$ELECTRON_VERSION" --force 2>&1 | sed 's/^/    /'
 
-rm -rf "$ROOT_APP_DIR/app_extracted/node_modules/better-sqlite3"
-rm -rf "$ROOT_APP_DIR/app_extracted/node_modules/node-pty"
-cp -a "$NATIVE_BUILD_DIR/node_modules/better-sqlite3" "$ROOT_APP_DIR/app_extracted/node_modules/"
-cp -a "$NATIVE_BUILD_DIR/node_modules/node-pty" "$ROOT_APP_DIR/app_extracted/node_modules/"
+# Update modules in app_extracted
+for mod in better-sqlite3 node-pty; do
+  rm -rf "$ROOT_APP_DIR/app_extracted/node_modules/$mod"
+  cp -a "$NATIVE_BUILD_DIR/node_modules/$mod" "$ROOT_APP_DIR/app_extracted/node_modules/"
+done
 
 BSQL_NODE="$ROOT_APP_DIR/app_extracted/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
 PTY_NODE="$ROOT_APP_DIR/app_extracted/node_modules/node-pty/build/Release/pty.node"
@@ -262,8 +289,12 @@ log_info "asar pack..."
 npx --yes asar pack "$ROOT_APP_DIR/app_extracted" "$REPACKED_ASAR" --unpack "**/*.node"
 [ -f "$REPACKED_ASAR" ] || die "codex.asar was not created"
 
-[ -f "$REPACKED_ASAR_UNPACKED/node_modules/better-sqlite3/build/Release/better_sqlite3.node" ] || die "better_sqlite3.node is missing in codex.asar.unpacked"
-[ -f "$REPACKED_ASAR_UNPACKED/node_modules/node-pty/build/Release/pty.node" ] || die "pty.node is missing in codex.asar.unpacked"
+# Verify critical modules in unpacked
+for node_file in \
+  "node_modules/better-sqlite3/build/Release/better_sqlite3.node" \
+  "node_modules/node-pty/build/Release/pty.node"; do
+  find "$REPACKED_ASAR_UNPACKED" -path "*/$node_file" | grep -q . || log_warn "Warning: $node_file might be missing in codex.asar.unpacked"
+done
 
 # [7] Prepare electron-builder project
 log_step "[7] Prepare electron-builder project"
@@ -284,8 +315,11 @@ cp -a "$APP_ICON_PATH" "$BUILDER_DIR/resources/electron.icns"
 
 log_info "Copying unpacked files..."
 mkdir -p "$BUILDER_DIR/resources/codex.asar.unpacked/node_modules"
+
 for dep in better-sqlite3 node-pty; do
-  cp -a "$REPACKED_ASAR_UNPACKED/node_modules/$dep" "$BUILDER_DIR/resources/codex.asar.unpacked/node_modules/"
+  if [ -d "$REPACKED_ASAR_UNPACKED/node_modules/$dep" ]; then
+    cp -a "$REPACKED_ASAR_UNPACKED/node_modules/$dep" "$BUILDER_DIR/resources/codex.asar.unpacked/node_modules/"
+  fi
 done
 
 find "$BUILDER_DIR/resources/codex.asar.unpacked" -name "*.node" -exec chmod 755 {} \;

@@ -1,67 +1,63 @@
-# Codex app macOS DMG -> Linux Repack
+# Codex App for Linux (DMG Repack)
 
-This repository contains:
+Unofficial Linux port of the OpenAI Codex Desktop application. This project converts the official macOS `.dmg` into a functional Linux AppImage by replacing native modules and applying compatibility patches.
 
-- `repack.sh` — a script that repacks upstream `Codex.dmg` into Linux artifacts.
-- `patches/` — a directory containing helper scripts for Linux compatibility:
-  - `patch-linux-open-targets.mjs` — patches application JavaScript for Linux editors/file managers.
-  - `patch-linux-opaque-bg.mjs` — enforces opaque window backgrounds to fix Wayland rendering issues.
-- `upstream.sha256` — tracks the hash of the last processed upstream DMG.
-- GitHub Actions automation that checks upstream DMG updates and publishes new GitHub Releases automatically.
+## Key Improvements in this Build
 
-The project is Linux-focused and produces portable build artifacts without distro-specific packaging.
+- **Automatic Extraction:** Robust DMG extraction using `7zz` with fallback for APFS support.
+- **Dynamic Native Modules:** Automatically detects and rebuilds `better-sqlite3`, `node-pty`, `sharp`, and `@napi-rs/canvas` for your Linux architecture.
+- **Linux-First Patches:**
+  - **System Tray:** Full support for the Linux system tray.
+  - **Window Behavior:** Automatically hides the menu bar (`Alt` to show) and sets the correct window icon.
+  - **Single Instance:** Prevents multiple copies of the app from running simultaneously.
+  - **Opaque Background:** Fixes rendering artifacts on Linux compositors (especially NVIDIA/Wayland).
+  - **Stability:** Prevents crashes in the "About" dialog and "Open in File Manager" commands.
 
-## What `repack.sh` does
+## Prerequisites
 
-1. Downloads (or reuses cached) upstream `Codex.dmg`.
-2. Extracts the `Codex.app` macOS bundle payload (`app.asar`, `app.asar.unpacked`, app metadata).
-3. Removes macOS-only artifacts (`sparkle-darwin`, `*.dylib`, `sparkle.node`).
-4. **Patches application JavaScript** (`patches/`) to support Linux-specific editors, file managers, and fix Wayland rendering issues.
-5. Rebuilds native modules (`better-sqlite3`, `node-pty`) for Linux/Electron.
-6. Re-packs `app.asar` with native unpack rules.
-7. Builds Linux `dir`, `AppImage`, and `tar.gz` artifacts via `electron-builder`.
-8. Produces release-ready artifacts:
-   - `codex-app-<version>-x86_64.AppImage`
-   - `codex-app-<version>-x86_64.tar.gz`
+Before running the repack script, ensure you have the following dependencies installed:
 
-## Local usage
-
+### Debian / Ubuntu
 ```bash
-bash ./repack.sh
+sudo apt-get update
+sudo apt-get install git curl nodejs npm python3 build-essential \
+                     libsqlite3-dev pkg-config libx11-dev libxkbfile-dev
 ```
 
-Useful environment variables:
+### Fedora
+```bash
+sudo dnf install git curl nodejs npm python3 gcc-c++ make \
+                 sqlite-devel pkgconf-pkg-config libX11-devel libxkbfile-devel
+```
 
-- `UPSTREAM_URL` — DMG source URL  
-  default: `https://persistent.oaistatic.com/codex-app-prod/Codex.dmg`
-- `CODEX_CLI_URL` — Linux Codex CLI archive URL  
-  default: `https://github.com/openai/codex/releases/latest/download/codex-x86_64-unknown-linux-musl.tar.gz`
-- `FORCE_DOWNLOAD=1` — force DMG re-download
-- `DMG_PATH` — custom local DMG path
+## Usage
 
-## Automated GitHub Releases
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Boria138/codex-app-linux.git
+   cd codex-app-linux
+   ```
 
-Workflow:
+2. **Run the repack script:**
+   ```bash
+   chmod +x repack.sh
+   ./repack.sh
+   ```
+   The script will:
+   - Check for required tools.
+   - Download the latest `Codex.dmg` from OpenAI.
+   - Extract and patch the application resources.
+   - Rebuild native Node.js modules for Linux.
+   - Pack the result into an **AppImage** and **tar.gz**.
 
-- `.github/workflows/auto-release.yml`
+3. **Find your build:**
+   Artifacts will be located in the `artifacts/` directory.
 
-Behavior:
+## Acknowledgments
 
-1. Periodically checks upstream DMG hash.
-2. If DMG changed, runs repack build.
-3. Publishes GitHub Release with built artifacts and checksums.
-4. Updates and commits `upstream.sha256` in this repo.
+- **Primary Inspiration & Patching:** Based on the excellent declarative patching system and techniques from [ilysenko/codex-desktop-linux](https://github.com/ilysenko/codex-desktop-linux).
+- **Open Targets:** The Linux open-targets patch is inspired by and adapted from the [openai-codex-desktop](https://aur.archlinux.org/packages/openai-codex-desktop) AUR package, with additional refinements for robustness and compatibility with newer upstream versions.
+- **System Patches:** The `better-sqlite3` and opaque background patches are adapted from [dcelasun's Gist](https://gist.github.com/dcelasun/8d002bc05d32491204c0bf695bc6b3d6).
+- **Build Strategy:** The environment variables for native module compilation and overall build approach are aligned with the [openai-codex-desktop](https://aur.archlinux.org/packages/openai-codex-desktop) AUR package standards.
+- **Community:** Inspired by the Arch Linux community's tireless efforts to port and maintain Electron applications.
 
-## Credits
-
-- The Linux open-targets patch is inspired by and adapted from the [openai-codex-desktop](https://aur.archlinux.org/packages/openai-codex-desktop) AUR package, with additional refinements for robustness and compatibility with newer upstream versions.
-- The `better-sqlite3` and opaque background patches are adapted from [dcelasun's Gist](https://gist.github.com/dcelasun/8d002bc05d32491204c0bf695bc6b3d6).
-- The build strategy (environment variables for native module compilation) is aligned with the same AUR package standards.
-
-## Notes
-
-- If the window flickers, renders incorrectly, or shows other display issues in a Wayland session, run the app through `Xwayland`, for example:
-  - `./codex-app-<version>-x86_64.AppImage --ozone-platform=x11`
-  - `./codex-app --ozone-platform=x11`
-- The app is configured to use bundled Linux `resources/codex` inside the packaged artifact.
-- `repack.sh` downloads the latest Linux `codex` CLI archive from GitHub Releases and copies `codex-x86_64-unknown-linux-musl` into `resources/codex`.
