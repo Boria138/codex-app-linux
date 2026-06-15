@@ -7,8 +7,6 @@ Unofficial Linux port of the OpenAI Codex Desktop application. This project conv
 - **Automatic Extraction:** Robust DMG extraction using `7zz` with fallback for APFS support.
 - **Dynamic Native Modules:** Automatically detects and rebuilds `better-sqlite3`, `node-pty`, `sharp`, and `@napi-rs/canvas` for your Linux architecture.
 - **Linux-First Patches:**
-  - **System Tray:** Full support for the Linux system tray.
-  - **Window Behavior:** Automatically hides the menu bar (`Alt` to show) and sets the correct window icon.
   - **Single Instance:** Prevents multiple copies of the app from running simultaneously.
   - **Opaque Background:** Fixes rendering artifacts on Linux compositors (especially NVIDIA/Wayland).
   - **Stability:** Prevents crashes in the "About" dialog and "Open in File Manager" commands.

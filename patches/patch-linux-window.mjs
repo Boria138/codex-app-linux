@@ -4,9 +4,7 @@
 // Patches the Codex desktop app to improve window behavior on Linux.
 //
 // Changes:
-//   1. Hides the menu bar by default (setMenuBarVisibility(false)).
-//   2. Sets the window icon to the bundled assets/icon.png.
-//   3. Prevents a crash in the "About" dialog when calling getFileIcon on Linux.
+//   1. Prevents a crash in the "About" dialog when calling getFileIcon on Linux.
 
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -36,27 +34,7 @@ const mainFile = mainFiles[0];
 let source = readFileSync(mainFile, "utf8");
 let patched = false;
 
-// 1. Hide Menu Bar
-const menuRegex = /process\.platform===`win32`&&([A-Za-z_$][\w$]*)\.removeMenu\(\),/g;
-if (menuRegex.test(source)) {
-  source = source.replace(menuRegex, (match, windowVar) => `process.platform===\`linux\`&&${windowVar}.setMenuBarVisibility(!1),${match}`);
-  console.log(`${TAG}: patched menu bar visibility`);
-  patched = true;
-}
-
-// 2. Set Window Icon
-const iconPathExpr = "process.resourcesPath+`/../content/webview/assets/icon.png`";
-const readyRegex = /([A-Za-z_$][\w$]*)\.once\(`ready-to-show`,\(\)=>\{/g;
-if (readyRegex.test(source)) {
-  source = source.replace(readyRegex, (match, windowVar) => {
-    if (source.includes(`${windowVar}.setIcon(`)) return match;
-    return `process.platform===\`linux\`&&${windowVar}.setIcon(${iconPathExpr}),${match}`;
-  });
-  console.log(`${TAG}: patched window icon setter`);
-  patched = true;
-}
-
-// 3. Fix About Dialog getFileIcon crash
+// Fix About Dialog getFileIcon crash
 const fileIconRegex = /([A-Za-z_$][\w$]*)\.app\.getFileIcon\(([^()]+),\{size:process\.platform===`win32`\?`large`:`normal`\}\)/g;
 if (fileIconRegex.test(source)) {
   source = source.replace(fileIconRegex, (match) => `process.platform===\`linux\`?Promise.resolve(null):${match}`);

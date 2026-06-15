@@ -164,11 +164,9 @@ node "$SCRIPT_DIR/patches/patch-linux-open-targets.mjs" "$ROOT_APP_DIR/app_extra
 log_info "Applying Linux opaque-background patch..."
 node "$SCRIPT_DIR/patches/patch-linux-opaque-bg.mjs" "$ROOT_APP_DIR/app_extracted"
 
-log_info "Applying Linux tray support patch..."
-node "$SCRIPT_DIR/patches/patch-linux-tray.mjs" "$ROOT_APP_DIR/app_extracted"
 
-# log_info "Applying Linux window behavior patches (Menu, Icon, About)..."
-# node "$SCRIPT_DIR/patches/patch-linux-window.mjs" "$ROOT_APP_DIR/app_extracted"
+log_info "Applying Linux About dialog crash fix..."
+node "$SCRIPT_DIR/patches/patch-linux-window.mjs" "$ROOT_APP_DIR/app_extracted"
 
 log_info "Applying Linux single-instance lock patch..."
 node "$SCRIPT_DIR/patches/patch-linux-single-instance.mjs" "$ROOT_APP_DIR/app_extracted"
