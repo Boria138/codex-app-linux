@@ -1,31 +1,36 @@
 #!/usr/bin/env node
-// SPDX-FileCopyrightText: 2026 Arch Linux Contributors
-// SPDX-License-Identifier: 0BSD
+// SPDX-License-Identifier: MIT
+//
+// Patches the Codex desktop app to support "Open in Editor/File Manager" on Linux.
+//
+// This patch identifies the "open-in-targets" registry in the main process
+// bundle and adds Linux-specific handlers for:
+//   - VS Code (stable/insiders)
+//   - Cursor
+//   - Windsurf
+//   - Zed
+//   - System File Manager (xdg-open)
 
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+const TAG = "patch-linux-open-targets";
 const appRoot = process.argv[2] ?? "app-extracted";
 const buildRoot = join(appRoot, ".vite", "build");
 
 function fail(message) {
-  console.error(`patch-linux-open-targets: ${message}`);
+  console.error(`${TAG}: ${message}`);
   process.exit(1);
-}
-
-function readJsFiles(dir) {
-  return readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".js"))
-    .map((entry) => join(dir, entry.name));
 }
 
 if (!existsSync(buildRoot) || !statSync(buildRoot).isDirectory()) {
   fail(`could not find Vite build directory: ${buildRoot}`);
 }
 
-const targetFiles = readJsFiles(buildRoot).filter((file) =>
-  readFileSync(file, "utf8").includes("open-in-targets"),
-);
+const targetFiles = readdirSync(buildRoot, { withFileTypes: true })
+  .filter((entry) => entry.isFile() && entry.name.endsWith(".js"))
+  .map((entry) => join(buildRoot, entry.name))
+  .filter((file) => readFileSync(file, "utf8").includes("open-in-targets"));
 
 if (targetFiles.length !== 1) {
   fail(`expected one open-in-targets bundle, found ${targetFiles.length}`);
@@ -35,7 +40,7 @@ const targetFile = targetFiles[0];
 let source = readFileSync(targetFile, "utf8");
 
 if (source.includes("function linuxResolveEditorTarget(")) {
-  console.log(`patch-linux-open-targets: ${targetFile} already patched`);
+  console.log(`${TAG}: bundle appears already patched`);
   process.exit(0);
 }
 
@@ -130,4 +135,4 @@ for (const marker of ["linuxResolveEditorTarget", "linuxFileManager", "code-oss"
 }
 
 writeFileSync(targetFile, source);
-console.log(`patch-linux-open-targets: patched ${targetFile}`);
+console.log(`${TAG}: patched ${targetFile}`);

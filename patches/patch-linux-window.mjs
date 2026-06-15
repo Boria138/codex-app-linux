@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: MIT
+//
+// Patches the Codex desktop app to improve window behavior on Linux.
+//
+// Changes:
+//   1. Hides the menu bar by default (setMenuBarVisibility(false)).
+//   2. Sets the window icon to the bundled assets/icon.png.
+//   3. Prevents a crash in the "About" dialog when calling getFileIcon on Linux.
+
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -6,19 +15,25 @@ const TAG = "patch-linux-window";
 const appRoot = process.argv[2] ?? "app-extracted";
 const buildRoot = join(appRoot, ".vite", "build");
 
+function fail(message) {
+  console.error(`${TAG}: ${message}`);
+  process.exit(1);
+}
+
 if (!existsSync(buildRoot) || !statSync(buildRoot).isDirectory()) {
-  console.error(`${TAG}: could not find Vite build directory: ${buildRoot}`);
-  process.exit(1);
+  fail(`could not find Vite build directory: ${buildRoot}`);
 }
 
-const mainFile = readdirSync(buildRoot).find(f => f.startsWith("main-") && f.endsWith(".js"));
-if (!mainFile) {
-  console.error(`${TAG}: main bundle not found`);
-  process.exit(1);
+const mainFiles = readdirSync(buildRoot, { withFileTypes: true })
+  .filter((e) => e.isFile() && e.name.startsWith("main-") && e.name.endsWith(".js"))
+  .map((e) => join(buildRoot, e.name));
+
+if (mainFiles.length !== 1) {
+  fail(`expected one main-*.js bundle, found ${mainFiles.length}`);
 }
 
-const filePath = join(buildRoot, mainFile);
-let source = readFileSync(filePath, "utf8");
+const mainFile = mainFiles[0];
+let source = readFileSync(mainFile, "utf8");
 let patched = false;
 
 // 1. Hide Menu Bar
@@ -42,13 +57,15 @@ if (readyRegex.test(source)) {
 }
 
 // 3. Fix About Dialog getFileIcon crash
-const fileIconRegex = /\.app\.getFileIcon\(([^()]+),\{size:process\.platform===`win32`\?`large`:`normal`\}\)/g;
+const fileIconRegex = /([A-Za-z_$][\w$]*)\.app\.getFileIcon\(([^()]+),\{size:process\.platform===`win32`\?`large`:`normal`\}\)/g;
 if (fileIconRegex.test(source)) {
-  source = source.replace(fileIconRegex, match => `process.platform===\`linux\`?Promise.resolve(null):${match}`);
+  source = source.replace(fileIconRegex, (match) => `process.platform===\`linux\`?Promise.resolve(null):${match}`);
   console.log(`${TAG}: patched about dialog file icon`);
   patched = true;
 }
 
 if (patched) {
-  writeFileSync(filePath, source);
+  writeFileSync(mainFile, source);
+} else {
+  console.log(`${TAG}: no patches applied (already patched?)`);
 }

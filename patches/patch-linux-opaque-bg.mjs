@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-// SPDX-FileCopyrightText: 2026 Arch Linux Contributors
-// SPDX-License-Identifier: 0BSD
+// SPDX-License-Identifier: MIT
 //
 // Patches the Codex desktop app to use opaque window backgrounds on Linux.
 //
