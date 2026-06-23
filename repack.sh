@@ -275,6 +275,44 @@ fi
 # Remove test TypeScript files from node-pty.
 find "$ROOT_APP_DIR/app_extracted/node_modules/node-pty" -type f \( -name "*.test.ts" -o -name "*.spec.ts" \) -delete 2>/dev/null || true
 
+log_info "Cleaning up build artifacts..."
+find "$ROOT_APP_DIR/app_extracted/node_modules/better-sqlite3" \
+  "$ROOT_APP_DIR/app_extracted/node_modules/node-pty" \
+  -type f \( -name Makefile -o -name '*.mk' -o -name config.gypi \) -delete 2>/dev/null || true
+find "$ROOT_APP_DIR/app_extracted/node_modules/better-sqlite3" \
+  "$ROOT_APP_DIR/app_extracted/node_modules/node-pty" \
+  -type d -name .deps -exec rm -rf '{}' + 2>/dev/null || true
+
+for _prebuild_root in "$ROOT_APP_DIR/app_extracted" "$ROOT_APP_DIR/app.asar.unpacked"; do
+  [ -d "$_prebuild_root" ] || continue
+  find "$_prebuild_root" -path '*/prebuilds/*' -type f -name '*.node' \
+    ! \( -path '*/linux-x64/*' -o -path '*/HID-linux-x64/*' -o -path '*/HID_hidraw-linux-x64/*' \) \
+    -delete 2>/dev/null || true
+  find "$_prebuild_root" -path '*/prebuilds/*' -type f -name '*musl*.node' -delete 2>/dev/null || true
+done
+
+# Remove macOS-only objc-js module (Apple Foundation/AppKit, dynamically imported behind platform check).
+rm -rf "$ROOT_APP_DIR/app_extracted/node_modules/objc-js" 2>/dev/null || true
+
+# Remove hidapi source code, test dirs, and build configs across node_modules.
+find "$ROOT_APP_DIR/app_extracted/node_modules" -path '*/hidapi/*' -type f \
+  \( -name '*.c' -o -name '*.h' -o -name '*.cmake' -o -name 'CMakeLists.txt' \
+     -o -name '*.sln' -o -name '*.vcproj' -o -name '*.vcxproj' -o -name '*.rc' \
+     -o -name 'Android.mk' -o -name 'Makefile*' -o -name '*.md' \) \
+  -delete 2>/dev/null || true
+
+# Remove binding.gyp files (build-time only).
+find "$ROOT_APP_DIR/app_extracted/node_modules" -name 'binding.gyp' -type f -delete 2>/dev/null || true
+
+# Remove test directories.
+find "$ROOT_APP_DIR/app_extracted/node_modules" -type d \( -name 'test' -o -name 'tests' -o -name '__tests__' -o -name 'fixtures' \) \
+  -exec rm -rf '{}' + 2>/dev/null || true
+
+# Remove docs and license files from node_modules (not needed at runtime).
+find "$ROOT_APP_DIR/app_extracted/node_modules" -type f \
+  \( -name '*.md' -o -name 'LICENSE*' -o -name 'LICENSES*' -o -name 'CHANGELOG*' -o -name 'HISTORY*' \) \
+  -delete 2>/dev/null || true
+
 # [6] Repack codex.asar
 log_step "[6] Repack codex.asar"
 
