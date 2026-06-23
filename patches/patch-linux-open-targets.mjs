@@ -27,10 +27,11 @@ if (!existsSync(buildRoot) || !statSync(buildRoot).isDirectory()) {
   fail(`could not find Vite build directory: ${buildRoot}`);
 }
 
+const registryDetection = /var [A-Za-z_$][\w$]*=\[[A-Za-z_$,]+\],[A-Za-z_$]+=[A-Za-z_$]+\.[A-Za-z_$]+\(`open-in-targets`\)/;
 const targetFiles = readdirSync(buildRoot, { withFileTypes: true })
   .filter((entry) => entry.isFile() && entry.name.endsWith(".js"))
   .map((entry) => join(buildRoot, entry.name))
-  .filter((file) => readFileSync(file, "utf8").includes("open-in-targets"));
+  .filter((file) => registryDetection.test(readFileSync(file, "utf8")));
 
 if (targetFiles.length !== 1) {
   fail(`expected one open-in-targets bundle, found ${targetFiles.length}`);
