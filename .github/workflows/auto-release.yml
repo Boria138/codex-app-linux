@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: "0 */6 * * *"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: true
+        default: "test"
+        type: choice
+        options:
+          - test
+          - release
 
 permissions:
   contents: write
@@ -11,6 +20,7 @@ permissions:
 env:
   UPSTREAM_URL: ${{ vars.UPSTREAM_URL || 'https://persistent.oaistatic.com/codex-app-prod/Codex.dmg' }}
   STATE_FILE: ${{ vars.STATE_FILE || 'upstream.sha256' }}
+  RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'release' }}
 
 jobs:
   release:
@@ -20,7 +30,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.head_ref || github.ref_name }}
           fetch-depth: 0
 
       - name: Install tooling
@@ -59,18 +69,26 @@ jobs:
             printf '%s\n' "$upstream_sha256" > "$STATE_FILE"
           fi
 
+          should_build=false
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            should_build=true
+          elif [[ "$changed" == "true" ]]; then
+            should_build=true
+          fi
+
           {
             printf 'changed=%s\n' "$changed"
+            printf 'should_build=%s\n' "$should_build"
             printf 'upstream_sha256=%s\n' "$upstream_sha256"
             printf 'dmg_path=%s\n' "Codex.dmg"
           } >> "$GITHUB_OUTPUT"
 
       - name: Skip when no upstream change
-        if: steps.check.outputs.changed != 'true'
-        run: echo "No upstream change detected."
+        if: steps.check.outputs.should_build != 'true'
+        run: echo "No upstream change detected; scheduled release build skipped."
 
-      - name: Build release artifacts
-        if: steps.check.outputs.changed == 'true'
+      - name: Build artifacts
+        if: steps.check.outputs.should_build == 'true'
         id: build
         run: |
           set -euo pipefail
@@ -78,7 +96,7 @@ jobs:
           ARTIFACT_DIR="$PWD/dist/release" bash ./repack.sh
 
       - name: Generate checksums
-        if: steps.check.outputs.changed == 'true'
+        if: steps.check.outputs.should_build == 'true'
         run: |
           set -euo pipefail
           cd dist/release
@@ -89,13 +107,25 @@ jobs:
             fi
           done
 
+      - name: Upload test artifact
+        if: steps.check.outputs.should_build == 'true' && env.RUN_MODE == 'test'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: codex-app-linux-${{ steps.build.outputs.app_version || 'test' }}
+          path: |
+            dist/release/*.AppImage
+            dist/release/*.tar.gz
+            dist/release/sha256sums.txt
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Publish to GitHub Release
-        if: steps.check.outputs.changed == 'true'
+        if: steps.check.outputs.should_build == 'true' && env.RUN_MODE == 'release'
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: ${{ steps.build.outputs.app_version || '0.0.0' }}
           body: |
-            Automated DMG repack release.
+            DMG repack release.
 
             - Version: ${{ steps.build.outputs.app_version }}
             - Upstream DMG SHA256: ${{ steps.check.outputs.upstream_sha256 }}
@@ -108,7 +138,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Debug workspace before commit
-        if: steps.check.outputs.changed == 'true'
+        if: steps.check.outputs.changed == 'true' && env.RUN_MODE == 'release'
         run: |
           set -euo pipefail
           pwd
@@ -118,7 +148,7 @@ jobs:
           ls -la "${GITHUB_WORKSPACE}/.git" || true
 
       - name: Commit upstream sha256 state
-        if: steps.check.outputs.changed == 'true'
+        if: steps.check.outputs.changed == 'true' && env.RUN_MODE == 'release'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

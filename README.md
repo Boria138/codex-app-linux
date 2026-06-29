@@ -9,7 +9,9 @@ Unofficial Linux port of the OpenAI Codex Desktop application. This project conv
 - **Linux-First Patches:**
   - **Single Instance:** Prevents multiple copies of the app from running simultaneously.
   - **Opaque Background:** Fixes rendering artifacts on Linux compositors (especially NVIDIA/Wayland).
-  - **Stability:** Prevents crashes in the "About" dialog and "Open in File Manager" commands.
+  - **Window Focus:** Ports the primary `BrowserWindow` focusability fix from `ilysenko/codex-desktop-linux`.
+  - **Core Linux Fixes:** Ports selected self-contained ilysenko core patches for menu visibility, resize repaint, XDG Documents, and git origins fallback.
+  - **Stability:** Prevents crashes in the "About" dialog and improves "Open in File Manager" / editor target handling.
 
 ## Prerequisites
 
@@ -53,9 +55,8 @@ sudo dnf install git curl nodejs npm python3 gcc-c++ make \
 
 ## Acknowledgments
 
-- **Primary Inspiration & Patching:** Based on the excellent declarative patching system and techniques from [ilysenko/codex-desktop-linux](https://github.com/ilysenko/codex-desktop-linux).
+- **Primary Inspiration & Patching:** Selected Linux window/core patches are adapted from [ilysenko/codex-desktop-linux](https://github.com/ilysenko/codex-desktop-linux), especially its main-process window/core Linux compatibility fixes.
 - **Open Targets:** The Linux open-targets patch is inspired by and adapted from the [openai-codex-desktop](https://aur.archlinux.org/packages/openai-codex-desktop) AUR package, with additional refinements for robustness and compatibility with newer upstream versions.
 - **System Patches:** The `better-sqlite3` and opaque background patches are adapted from [dcelasun's Gist](https://gist.github.com/dcelasun/8d002bc05d32491204c0bf695bc6b3d6).
 - **Build Strategy:** The environment variables for native module compilation and overall build approach are aligned with the [openai-codex-desktop](https://aur.archlinux.org/packages/openai-codex-desktop) AUR package standards.
 - **Community:** Inspired by the Arch Linux community's tireless efforts to port and maintain Electron applications.
-

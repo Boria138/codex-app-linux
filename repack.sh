@@ -168,6 +168,12 @@ node "$SCRIPT_DIR/patches/patch-linux-opaque-bg.mjs" "$ROOT_APP_DIR/app_extracte
 log_info "Applying Linux About dialog crash fix..."
 node "$SCRIPT_DIR/patches/patch-linux-window.mjs" "$ROOT_APP_DIR/app_extracted"
 
+log_info "Applying Linux keyboard focus patch..."
+node "$SCRIPT_DIR/patches/patch-linux-keyboard-focus.mjs" "$ROOT_APP_DIR/app_extracted"
+
+log_info "Applying Linux ilysenko core patches..."
+node "$SCRIPT_DIR/patches/patch-linux-ilysenko-core.mjs" "$ROOT_APP_DIR/app_extracted"
+
 log_info "Applying Linux single-instance lock patch..."
 node "$SCRIPT_DIR/patches/patch-linux-single-instance.mjs" "$ROOT_APP_DIR/app_extracted"
 
