@@ -287,6 +287,64 @@ fi
 # Remove test TypeScript files from node-pty.
 find "$ROOT_APP_DIR/app_extracted/node_modules/node-pty" -type f \( -name "*.test.ts" -o -name "*.spec.ts" \) -delete 2>/dev/null || true
 
+log_info "Cleaning platform-specific and development-only files..."
+cleanup_size_kb() {
+  local total=0 size=0 dir
+  for dir in "$ROOT_APP_DIR/app_extracted" "$ROOT_APP_DIR/app.asar.unpacked"; do
+    [ -d "$dir" ] || continue
+    size="$(du -sk "$dir" | awk '{print $1}')"
+    total=$((total + size))
+  done
+  printf '%s\n' "$total"
+}
+CLEAN_SIZE_BEFORE_KB="$(cleanup_size_kb)"
+
+# Remove build intermediates and sources only from the two modules rebuilt above.
+# Their runtime JavaScript and the resulting build/Release/*.node files are kept.
+for module_dir in \
+  "$ROOT_APP_DIR/app_extracted/node_modules/better-sqlite3" \
+  "$ROOT_APP_DIR/app_extracted/node_modules/node-pty"; do
+  [ -d "$module_dir" ] || continue
+
+  find "$module_dir" -type d \
+    \( -name .deps -o -name obj -o -name obj.target -o -name '*.dSYM' \) \
+    -prune -exec rm -rf -- '{}' +
+  find "$module_dir" -type f \
+    \( -name Makefile -o -name '*.mk' -o -name config.gypi -o -name binding.gyp \
+       -o -name '*.o' -o -name '*.a' -o -name '*.d' -o -name '*.pdb' \) \
+    -delete
+  rm -rf "$module_dir/src" "$module_dir/deps" "$module_dir/tools"
+done
+
+for cleanup_root in "$ROOT_APP_DIR/app_extracted" "$ROOT_APP_DIR/app.asar.unpacked"; do
+  [ -d "$cleanup_root" ] || continue
+
+  # Delete only paths that explicitly identify an unsupported platform or CPU.
+  # Unknown layouts are retained so new runtime bindings are not removed by accident.
+  find "$cleanup_root" -type f -name '*.node' \
+    \( -path '*/darwin-*/*' -o -path '*/win32-*/*' -o -path '*/windows-*/*' \
+       -o -path '*/android-*/*' -o -path '*/linux-arm/*' -o -path '*/linux-arm64/*' \
+       -o -path '*/linux-ia32/*' -o -path '*/HID-darwin-*/*' -o -path '*/HID-win32-*/*' \
+       -o -path '*/HID-linux-arm*/*' -o -name '*musl*.node' \) \
+    -delete
+  find "$cleanup_root" -type d -name '*.dSYM' -prune -exec rm -rf -- '{}' +
+done
+
+# These files provide development metadata only; retain JavaScript, fixtures,
+# package metadata, and licenses because packages may use them at runtime.
+find "$ROOT_APP_DIR/app_extracted/node_modules" -type f \
+  \( -name '*.map' -o -name '*.d.ts' -o -name '*.flow' \) \
+  -delete 2>/dev/null || true
+
+# Fail early if cleanup ever removes either required rebuilt binding.
+[ -f "$BSQL_NODE" ] || die "Cleanup removed better_sqlite3.node"
+[ -f "$PTY_NODE" ] || die "Cleanup removed pty.node"
+
+CLEAN_SIZE_AFTER_KB="$(cleanup_size_kb)"
+CLEAN_SAVED_KB=$((CLEAN_SIZE_BEFORE_KB - CLEAN_SIZE_AFTER_KB))
+[ "$CLEAN_SAVED_KB" -lt 0 ] && CLEAN_SAVED_KB=0
+log_info "Cleanup saved approximately $((CLEAN_SAVED_KB / 1024)) MiB before compression"
+
 # [6] Repack codex.asar
 log_step "[6] Repack codex.asar"
 
