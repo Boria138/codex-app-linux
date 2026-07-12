@@ -10,7 +10,7 @@ Unofficial Linux port of the OpenAI Codex Desktop application. This project conv
   - **Single Instance:** Prevents multiple copies of the app from running simultaneously.
   - **Opaque Background:** Fixes rendering artifacts on Linux compositors (especially NVIDIA/Wayland).
   - **Window Focus:** Ports the primary `BrowserWindow` focusability fix from `ilysenko/codex-desktop-linux`.
-  - **Core Linux Fixes:** Ports selected self-contained ilysenko core patches for menu visibility, resize repaint, XDG Documents, and git origins fallback.
+- **Core Linux Fixes:** Ports selected self-contained ilysenko core patches for menu visibility, resize repaint, git origins fallback, and XDG data storage at `${XDG_DATA_HOME:-$HOME/.local/share}/Codex` instead of `~/Documents/Codex`.
   - **Stability:** Prevents crashes in the "About" dialog and improves "Open in File Manager" / editor target handling.
 
 ## Prerequisites

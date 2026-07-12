@@ -18,12 +18,6 @@ function fail(message) {
   process.exit(1);
 }
 
-function requireName(source, moduleName) {
-  const escaped = moduleName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = source.match(new RegExp(`([A-Za-z_$][\\w$]*)=require\\(([\\\`"'])${escaped}\\2\\)`));
-  return match?.[1] ?? null;
-}
-
 function findMainFile() {
   if (!existsSync(buildRoot) || !statSync(buildRoot).isDirectory()) {
     fail(`could not find Vite build directory: ${buildRoot}`);
@@ -132,13 +126,8 @@ function applyLinuxGitOriginsSourceFallbackPatch(source) {
   };
 }
 
-function applyLinuxXdgDocumentsDirPatch(source) {
-  if (source.includes("codexLinuxXdgDocumentsDir")) {
-    return { source, changed: false };
-  }
-
-  const fsVar = requireName(source, "node:fs");
-  if (fsVar == null) {
+function applyLinuxXdgDataDirPatch(source) {
+  if (source.includes("codexLinuxXdgDataDir")) {
     return { source, changed: false };
   }
 
@@ -151,22 +140,13 @@ function applyLinuxXdgDocumentsDirPatch(source) {
 
   const [, fnName, desktopPathsVar, homeDirVar, platformVar, sameHomeFn, pathFactoryFn] = match;
   const helper = [
-    "function codexLinuxXdgDocumentsDir({fs:e,homeDir:t,path:n}){try{",
-    "let r=process.env.XDG_CONFIG_HOME?.trim(),i=r&&n.isAbsolute(r)?n.join(r,`user-dirs.dirs`):n.join(t,`.config`,`user-dirs.dirs`);",
-    "if(!e.existsSync(i))return null;",
-    "let a=e.readFileSync(i,`utf8`).match(/^XDG_DOCUMENTS_DIR=([\"'])(.*)\\1/m);",
-    "if(a==null)return null;",
-    "let o=a[2].replace(/\\\\(.)/g,`$1`);",
-    "if(o===`$HOME`)return t;",
-    "if(o.startsWith(`$HOME/`))return n.join(t,o.slice(6));",
-    "if(o.startsWith(`~/`))return n.join(t,o.slice(2));",
-    "return n.isAbsolute(o)?o:n.join(t,o)",
-    "}catch{return null}}",
+    "function codexLinuxXdgDataDir({homeDir:e,path:t}){",
+    "let n=process.env.XDG_DATA_HOME?.trim();",
+    "return n&&t.isAbsolute(n)?n:t.join(e,`.local`,`share`)}",
   ].join("");
   const patchedFn =
     `${helper}function ${fnName}({desktopPaths:${desktopPathsVar},homeDir:${homeDirVar},platform:${platformVar}}){` +
-    `if(${platformVar}===\`linux\`){let __codexLinuxDocumentsDir=codexLinuxXdgDocumentsDir({fs:${fsVar},homeDir:${homeDirVar},path:${pathFactoryFn}(${platformVar})});` +
-    "if(__codexLinuxDocumentsDir!=null)return __codexLinuxDocumentsDir}" +
+    `if(${platformVar}===\`linux\`)return codexLinuxXdgDataDir({homeDir:${homeDirVar},path:${pathFactoryFn}(${platformVar})});` +
     `return ${sameHomeFn}(${homeDirVar},${desktopPathsVar}.getPath(\`home\`),${platformVar})?${desktopPathsVar}.getPath(\`documents\`):${pathFactoryFn}(${platformVar}).join(${homeDirVar},\`Documents\`)}`;
 
   return { source: source.replace(documentsDirRegex, () => patchedFn), changed: true };
@@ -179,7 +159,7 @@ const patchers = [
   ["ready-to-show window state", applyLinuxReadyToShowWindowStatePatch],
   ["resize repaint", applyLinuxResizeRepaintPatch],
   ["git origins source fallback", applyLinuxGitOriginsSourceFallbackPatch],
-  ["XDG documents dir", applyLinuxXdgDocumentsDirPatch],
+  ["XDG data dir", applyLinuxXdgDataDirPatch],
 ];
 
 const applied = [];
