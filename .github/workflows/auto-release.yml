@@ -107,15 +107,21 @@ jobs:
             fi
           done
 
-      - name: Upload test artifact
+      - name: Upload test AppImage artifact
         if: steps.check.outputs.should_build == 'true' && env.RUN_MODE == 'test'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: codex-app-linux-${{ steps.build.outputs.app_version || 'test' }}
-          path: |
-            dist/release/*.AppImage
-            dist/release/*.tar.gz
-            dist/release/sha256sums.txt
+          name: codex-app-linux-${{ steps.build.outputs.app_version || 'test' }}-appimage
+          path: dist/release/*.AppImage
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload test tar.gz artifact
+        if: steps.check.outputs.should_build == 'true' && env.RUN_MODE == 'test'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: codex-app-linux-${{ steps.build.outputs.app_version || 'test' }}-tar-gz
+          path: dist/release/*.tar.gz
           if-no-files-found: error
           retention-days: 14
 

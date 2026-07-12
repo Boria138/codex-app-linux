@@ -118,11 +118,17 @@ rm -f 7z.tar.xz
 log_info "Running extraction..."
 # 7zz returns code 2 when skipping dangerous symlinks (common in node_modules).
 # We allow this as they aren't needed for the port.
-"$DOWNLOAD_DIR_7Z/7zz" x -snl -y -aoa "$DMG_PATH" -o./dmg_extracted 'Codex Installer/Codex.app/*' > /dev/null || [ $? -eq 2 ]
+DMG_EXTRACT_DIR="$ROOT_APP_DIR/dmg_extracted"
+mkdir -p "$DMG_EXTRACT_DIR"
+extract_status=0
+"$DOWNLOAD_DIR_7Z/7zz" x -snl -y -aoa "$DMG_PATH" "-o$DMG_EXTRACT_DIR" > /dev/null || extract_status=$?
+if [ "$extract_status" -ne 0 ] && [ "$extract_status" -ne 2 ]; then
+  die "7zz failed to extract the DMG (exit code: $extract_status)"
+fi
 
 # Find app bundle without causing 'Broken pipe' with pipefail
-APP_BUNDLE_DIR="$(find ./dmg_extracted -maxdepth 6 -type d -name '*.app' -print -quit)"
-[ -n "$APP_BUNDLE_DIR" ] || die "Could not find .app bundle"
+APP_BUNDLE_DIR="$(find "$DMG_EXTRACT_DIR" -maxdepth 6 -type d -name '*.app' -print -quit)"
+[ -n "$APP_BUNDLE_DIR" ] || die "Could not find a .app bundle in the extracted DMG"
 APP_BUNDLE_DIR="$(realpath "$APP_BUNDLE_DIR")"
 log_info "Found app bundle: $APP_BUNDLE_DIR"
 
@@ -181,7 +187,7 @@ node "$SCRIPT_DIR/patches/patch-linux-single-instance.mjs" "$ROOT_APP_DIR/app_ex
 log_step "[4] Detect Electron version"
 
 ELECTRON_VERSION=""
-ELECTRON_PLIST="$(find ./dmg_extracted -path "*/Electron Framework.framework/Versions/A/Resources/Info.plist" | head -n1)"
+ELECTRON_PLIST="$(find "$DMG_EXTRACT_DIR" -path "*/Electron Framework.framework/Versions/A/Resources/Info.plist" -print -quit)"
 if [ -n "$ELECTRON_PLIST" ] && [ -f "$ELECTRON_PLIST" ]; then
   ELECTRON_VERSION="$(python3 - "$ELECTRON_PLIST" <<'PY'
 import plistlib,re,sys
