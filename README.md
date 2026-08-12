@@ -1,5 +1,10 @@
 # Codex App for Linux (DMG Repack)
 
+> [!IMPORTANT]
+> **This repository is archived and no longer maintained.**
+>
+> An official ChatGPT desktop app for Linux with Codex is now available in preview. Please use the [official Linux release](https://community.openai.com/t/codex-in-chatgpt-desktop-app-for-linux-is-now-in-preview/1390027) instead of this unofficial repack.
+
 Unofficial Linux port of the OpenAI Codex Desktop application. This project converts the official macOS `.dmg` into a functional Linux AppImage by replacing native modules and applying compatibility patches.
 
 ## Key Improvements in this Build
